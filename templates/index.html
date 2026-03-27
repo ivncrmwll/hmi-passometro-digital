@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <title>Passômetro Digital - HMINSN</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --cor-primaria: #005b96;
+            --cor-secundaria: #03396c;
+            
+            /* Cores com intensidade ajustada */
+            {% if setor_atual == 'Girassóis' %}
+                --bg-claro: #fff59d;
+            {% elif setor_atual == 'Azaléias' %}
+                --bg-claro: #f8bbd0;
+            {% elif setor_atual == 'Margaridas' %}
+                --bg-claro: #ffe0b2;
+            {% elif setor_atual == 'Orquídeas' %}
+                --bg-claro: #e1bee7;
+            {% elif setor_atual == 'Rosas' %}
+                --bg-claro: #ffcdd2;
+            {% elif setor_atual == 'Acolhimento/Emergência' %}
+                --bg-claro: #bbdefb;
+            {% elif setor_atual == 'Centro Cirúrgico' %}
+                --bg-claro: #c8e6c9;
+            {% elif setor_atual == 'UTI Neo' %}
+                --bg-claro: #b2ebf2;
+            {% else %}
+                --bg-claro: #e3f2fd;
+            {% endif %}
+        }
+
+        [data-bs-theme="light"] body { background-color: var(--bg-claro) !important; }
+        [data-bs-theme="light"] .container-menu { background-color: #ffffff; }
+        [data-bs-theme="light"] .nav-pills .nav-link:not(.active) { color: var(--cor-primaria); }
+
+        [data-bs-theme="dark"] body { background-color: #121212 !important; color: #e0e0e0; }
+        [data-bs-theme="dark"] .card, [data-bs-theme="dark"] .container-menu { background-color: #1e1e1e !important; border: 1px solid #333; }
+        [data-bs-theme="dark"] .text-dark, [data-bs-theme="dark"] .text-secondary, [data-bs-theme="dark"] .text-muted { color: #b0b0b0 !important; }
+        [data-bs-theme="dark"] .navbar-custom { background: linear-gradient(90deg, #1a1a1a, #2d2d2d) !important; }
+        [data-bs-theme="dark"] .table-primary { --bs-table-bg: #03396c; --bs-table-color: #ffffff; --bs-table-border-color: #005b96; }
+        [data-bs-theme="dark"] .table { --bs-table-bg: #1e1e1e; --bs-table-color: #e0e0e0; --bs-table-border-color: #333; --bs-table-hover-bg: #2a2a2a; --bs-table-hover-color: #fff; }
+        [data-bs-theme="dark"] .nav-pills .nav-link:not(.active) { color: #90caf9; }
+
+        body { transition: background-color 0.3s ease, color 0.3s ease; }
+        .navbar-custom { background: linear-gradient(90deg, var(--cor-primaria), var(--cor-secundaria)) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card, .container-menu { border-radius: 12px; border: none; transition: background-color 0.3s ease; }
+        .nav-pills .nav-link.active { background-color: var(--cor-primaria); border-radius: 20px; color: white !important; }
+        .nav-pills .nav-link { border-radius: 20px; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark navbar-custom mb-4 py-3 shadow-sm">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand mb-0 h1 fw-bold">🏥 HMINSN - Passômetro Digital</span>
+            <div class="d-flex align-items-center">
+                <button id="btn-tema" class="btn btn-outline-light btn-sm me-3 rounded-pill px-3">🌙 Escuro</button>
+                
+                {% if logado %}
+                    <span class="text-warning me-3 border-end pe-3 d-flex align-items-center">
+                        <small class="me-2">Olá, <strong>{{ session.usuario_nome }}</strong> ({{ session.usuario_cargo }})</small>
+                        <a href="/alterar_senha" class="btn btn-sm btn-outline-light rounded-circle p-1 d-flex align-items-center justify-content-center" style="width: 28px; height: 28px;" title="Alterar Senha">🔑</a>
+                    </span>
+                    
+                    {% if session.usuario_cargo == 'Global Admin' or session.usuario_cargo == 'Coord. de Ala' %}
+                        <a href="/admin" class="btn btn-sm btn-warning fw-bold rounded-pill px-3 me-2">⚙️ Admin</a>
+                    {% endif %}
+                    
+                    <a href="/logout" class="btn btn-sm btn-light text-primary fw-bold rounded-pill px-3">Sair</a>
+                {% else %}
+                    <span class="text-light me-3"><small>Modo: Leitura</small></span>
+                    <a href="/login" class="btn btn-sm btn-light text-primary fw-bold rounded-pill px-3">Acesso Enfermagem</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fw-bold text-secondary">Visão Geral do Plantão</h3>
+            <div>
+                {% if logado %}
+                <div class="dropdown d-inline-block me-2">
+                    <button class="btn btn-outline-success dropdown-toggle fw-bold rounded-pill" type="button" data-bs-toggle="dropdown">📊 Excel</button>
+                    <ul class="dropdown-menu shadow">
+                        <li><a class="dropdown-item" href="/exportar/csv/diario">Diário (24h)</a></li>
+                        <li><a class="dropdown-item" href="/exportar/csv/semanal">Semanal (7 Dias)</a></li>
+                        <li><a class="dropdown-item" href="/exportar/csv/mensal">Mensal (30 Dias)</a></li>
+                        <li><a class="dropdown-item" href="/exportar/csv/anual">Anual (365 Dias)</a></li>
+                    </ul>
+                </div>
+                <div class="dropdown d-inline-block me-2">
+                    <button class="btn btn-outline-danger dropdown-toggle fw-bold rounded-pill" type="button" data-bs-toggle="dropdown">📄 PDF</button>
+                    <ul class="dropdown-menu shadow">
+                        <li><a class="dropdown-item" href="/exportar/pdf/diario">Diário (24h)</a></li>
+                        <li><a class="dropdown-item" href="/exportar/pdf/semanal">Semanal (7 Dias)</a></li>
+                        <li><a class="dropdown-item" href="/exportar/pdf/mensal">Mensal (30 Dias)</a></li>
+                        <li><a class="dropdown-item" href="/exportar/pdf/anual">Anual (365 Dias)</a></li>
+                    </ul>
+                </div>
+                <a href="/adicionar" class="btn btn-primary fw-bold shadow-sm rounded-pill px-4">+ Adicionar Paciente</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-white shadow-sm h-100" style="background-color: var(--cor-primaria);">
+                    <div class="card-body">
+                        <h6 class="card-title text-uppercase text-white-50 fw-bold">Internados (Hospital)</h6>
+                        <h1 class="mb-0 fw-bold">{{ total_internados }}</h1>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-success shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-uppercase text-white-50 fw-bold">Altas (Últimas 24h)</h6>
+                        <h1 class="mb-0 fw-bold">{{ altas_24h }}</h1>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card shadow-sm h-100 container-menu">
+                    <div class="card-body">
+                        <h6 class="card-title text-uppercase fw-bold text-primary">
+                            {% if setor_atual %}Ocupação: {{ setor_atual }}{% else %}Filtro Atual{% endif %}
+                        </h6>
+                        <h1 class="mb-0 fw-bold text-primary">
+                            {% if setor_atual %}{{ total_setor }}{% else %}Geral{% endif %}
+                        </h1>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container-menu p-3 shadow-sm mb-4">
+            <ul class="nav nav-pills justify-content-center">
+                <li class="nav-item"><a class="nav-link px-4 {% if not setor_atual and not aba_altas %}active{% endif %}" href="/">Geral</a></li>
+                <li class="nav-item"><a class="nav-link px-4 {% if setor_atual == 'Girassóis' %}active{% endif %}" href="/?setor=Girassóis">Girassóis</a></li>
+                <li class="nav-item"><a class="nav-link px-4 {% if setor_atual == 'Azaléias' %}active{% endif %}" href="/?setor=Azaléias">Azaléias</a></li>
+                <li class="nav-item"><a class="nav-link px-4 {% if setor_atual == 'Margaridas' %}active{% endif %}" href="/?setor=Margaridas">Margaridas</a></li>
+                <li class="nav-item"><a class="nav-link px-4 {% if setor_atual == 'Orquídeas' %}active{% endif %}" href="/?setor=Orquídeas">Orquídeas</a></li>
+                <li class="nav-item"><a class="nav-link px-4 {% if setor_atual == 'Rosas' %}active{% endif %}" href="/?setor=Rosas">Rosas</a></li>
+                <li class="nav-item"><a class="nav-link px-4 {% if setor_atual == 'Centro Cirúrgico' %}active{% endif %}" href="/?setor=Centro Cirúrgico">Centro Cirúrgico</a></li>
+                <li class="nav-item"><a class="nav-link px-4 {% if setor_atual == 'UTI Neo' %}active{% endif %}" href="/?setor=UTI Neo">UTI Neo</a></li>
+                <li class="nav-item"><a class="nav-link px-4 {% if setor_atual == 'Acolhimento/Emergência' %}active{% endif %}" href="/?setor=Acolhimento/Emergência">Emergência</a></li>
+                <li class="nav-item ms-auto"><a class="nav-link px-4 text-danger fw-bold {% if aba_altas %}active bg-danger text-white{% endif %}" href="/?altas=true">Altas/Evasão (24h)</a></li>
+            </ul>
+        </div>
+
+        <div class="card shadow-sm mb-5">
+            <div class="card-body table-responsive">
+                <table class="table table-hover align-middle" style="font-size: 0.9rem;">
+                    <thead class="table-primary text-center">
+                        <tr>
+                            <th>Ala/Setor</th>
+                            <th>Leito</th>
+                            <th class="text-start">Paciente / Prontuário</th>
+                            <th>Parto / RN</th>
+                            <th class="text-start">Diagnóstico</th>
+                            <th class="text-start">Observações</th>
+                            <th>Enf(a)</th>
+                            {% if not aba_altas and logado %}
+                                <th>Ações</th>
+                            {% elif aba_altas %}
+                                <th>Status e Data</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in plantoes %}
+                        <tr>
+                            <td class="text-center"><span class="badge bg-secondary rounded-pill px-3">{{ p.setor }}</span></td>
+                            <td class="text-center"><strong class="text-primary fs-5">{{ p.leito }}</strong></td>
+                            <td>
+                                <strong class="fs-6">{{ p.nome_paciente }}</strong> <br>
+                                <span class="text-muted small">Idade: {{ p.idade }} | Pront: {{ p.prontuario }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if p.tipo_parto %}
+                                <span class="badge bg-info text-dark mb-1">{{ p.tipo_parto }}</span><br>
+                                {% endif %}
+                                <small class="text-muted">{{ p.dados_rn }}</small>
+                            </td>
+                            <td>{{ p.diagnostico }}</td>
+                            <td>{{ p.observacoes }}</td>
+                            <td class="text-center fw-bold">{{ p.enfermeiro_resp }}</td>
+                            
+                            {% if not aba_altas and logado %}
+                            <td class="text-center">
+                                <a href="/editar/{{ p.id }}" class="btn btn-sm btn-outline-primary mb-1 d-block rounded-pill">Editar</a>
+                                
+                                {% if session.usuario_cargo == 'Global Admin' or session.usuario_setor == 'Todos' or session.usuario_setor == p.setor %}
+                                    <a href="/transferir/{{ p.id }}" class="btn btn-sm btn-outline-warning mb-1 d-block rounded-pill">Transferir</a>
+                                    <a href="/evasao/{{ p.id }}" class="btn btn-sm btn-outline-secondary mb-1 d-block rounded-pill">Evasão</a>
+                                    
+                                    {% if p.setor not in ['Orquídeas', 'Acolhimento/Emergência', 'Centro Cirúrgico'] %}
+                                        <a href="/alta/{{ p.id }}" class="btn btn-sm btn-outline-danger d-block rounded-pill" onclick="return confirm('Confirmar alta?')">Alta</a>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            {% elif aba_altas %}
+                            <td class="text-center">
+                                {% if p.status == 'Evasão' %}
+                                    <span class="badge bg-secondary mb-1">Evasão</span><br>
+                                {% else %}
+                                    <span class="badge bg-success mb-1">Alta</span><br>
+                                {% endif %}
+                                <span class="text-muted fw-bold">{{ p.data_alta.strftime('%d/%m/%Y %H:%M') }}</span>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-5">Nenhum paciente encontrado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const html = document.documentElement;
+        const btnTema = document.getElementById('btn-tema');
+        
+        const temaSalvo = localStorage.getItem('tema');
+        if (temaSalvo === 'dark') {
+            html.setAttribute('data-bs-theme', 'dark');
+            btnTema.textContent = '☀️ Claro';
+            btnTema.classList.replace('btn-outline-light', 'btn-light');
+        }
+
+        btnTema.addEventListener('click', () => {
+            const temaAtual = html.getAttribute('data-bs-theme');
+            if (temaAtual === 'light') {
+                html.setAttribute('data-bs-theme', 'dark');
+                localStorage.setItem('tema', 'dark');
+                btnTema.textContent = '☀️ Claro';
+                btnTema.classList.replace('btn-outline-light', 'btn-light');
+            } else {
+                html.setAttribute('data-bs-theme', 'light');
+                localStorage.setItem('tema', 'light');
+                btnTema.textContent = '🌙 Escuro';
+                btnTema.classList.replace('btn-light', 'btn-outline-light');
+            }
+        });
+    </script>
+</body>
+</html>

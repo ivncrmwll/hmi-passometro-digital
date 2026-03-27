@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <title>Adicionar Paciente</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --cor-primaria: #005b96; --cor-secundaria: #03396c; --bg-claro: #e3f2fd; }
+        [data-bs-theme="light"] body { background-color: var(--bg-claro) !important; }
+        [data-bs-theme="dark"] body { background-color: #121212 !important; color: #e0e0e0; }
+        [data-bs-theme="dark"] .card { background-color: #1e1e1e !important; border: 1px solid #333; }
+        [data-bs-theme="dark"] .form-control, [data-bs-theme="dark"] .form-select { background-color: #2a2a2a; color: #fff; border-color: #444; }
+        [data-bs-theme="dark"] .form-label { color: #b0b0b0 !important; }
+        .navbar-custom { background: linear-gradient(90deg, var(--cor-primaria), var(--cor-secundaria)) !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark navbar-custom mb-4 py-3 shadow-sm">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand mb-0 h1 fw-bold">🏥 Adicionar Paciente</span>
+        </div>
+    </nav>
+    <div class="container mb-5">
+        <div class="card shadow-sm mx-auto" style="max-width: 700px;">
+            <div class="card-body">
+                <form method="POST" action="/adicionar">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Prontuário</label>
+                            <input type="text" name="prontuario" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Setor (Ala)</label>
+                            <select name="setor" class="form-select" required>
+                                <option value="Girassóis">Girassóis</option>
+                                <option value="Azaléias">Azaléias</option>
+                                <option value="Margaridas">Margaridas</option>
+                                <option value="Orquídeas">Orquídeas</option>
+                                <option value="Rosas">Rosas</option>
+                                <option value="Acolhimento/Emergência">Emergência</option>
+                                <option value="Centro Cirúrgico">Centro Cirúrgico</option>
+                                <option value="UTI Neo">UTI Neo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Leito</label>
+                            <input type="text" name="leito" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-9">
+                            <label class="form-label fw-bold">Nome da Paciente</label>
+                            <input type="text" name="nome_paciente" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Idade</label>
+                            <input type="text" name="idade" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row mb-3 p-2 rounded border mx-0">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-primary">Tipo de Parto</label>
+                            <select name="tipo_parto" class="form-select">
+                                <option value="">Não se aplica</option>
+                                <option value="Parto Normal">Parto Normal</option>
+                                <option value="Cesariana">Cesariana</option>
+                                <option value="Fórceps">Fórceps</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-primary">Dados do RN</label>
+                            <input type="text" name="dados_rn" class="form-control">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Diagnóstico</label>
+                        <input type="text" name="diagnostico" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Observações</label>
+                        <textarea name="observacoes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Enfermeiro(a) Responsável</label>
+                        <input type="text" name="enfermeiro_resp" class="form-control">
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="/" class="btn btn-secondary px-4">Voltar</a>
+                        <button type="submit" class="btn btn-success px-4 fw-bold">Salvar Paciente</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        if (localStorage.getItem('tema') === 'dark') document.documentElement.setAttribute('data-bs-theme', 'dark');
+    </script>
+</body>
+</html>

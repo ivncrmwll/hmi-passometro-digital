@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <title>Rastreabilidade (Logs)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --cor-primaria: #005b96; --cor-secundaria: #03396c; --bg-claro: #f0f4f8; }
+        [data-bs-theme="light"] body { background-color: var(--bg-claro) !important; }
+        [data-bs-theme="dark"] body { background-color: #121212 !important; color: #e0e0e0; }
+        [data-bs-theme="dark"] .card { background-color: #1e1e1e !important; border: 1px solid #333; }
+        [data-bs-theme="dark"] .table { --bs-table-bg: #1e1e1e; --bs-table-color: #e0e0e0; }
+        [data-bs-theme="dark"] .form-control { background-color: #2a2a2a; color: #fff; border-color: #444; }
+        .navbar-custom { background: linear-gradient(90deg, var(--cor-primaria), var(--cor-secundaria)) !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark navbar-custom mb-4 py-3 shadow-sm">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand mb-0 h1 fw-bold">📋 Relatório de Atividades (Últimas 72h)</span>
+            <a href="/admin" class="btn btn-outline-light btn-sm rounded-pill px-3">Voltar ao Admin</a>
+        </div>
+    </nav>
+    <div class="container mb-5">
+        <div class="d-flex justify-content-between align-items-end mb-3">
+            <div>
+                <input type="text" id="buscaLog" class="form-control form-control-sm shadow-sm" placeholder="🔍 Buscar usuário, setor ou ação..." style="width: 350px;">
+            </div>
+        </div>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <table class="table table-hover align-middle" id="tabelaLogs">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Data / Hora</th>
+                            <th>Usuário</th>
+                            <th>Setor</th>
+                            <th>Ação Realizada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="fw-bold text-muted">{{ log.data_hora.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td class="text-primary fw-bold termo-busca">{{ log.usuario_nome }}</td>
+                            <td class="termo-busca"><span class="badge bg-secondary">{{ log.setor_usuario }}</span></td>
+                            <td class="termo-busca">{{ log.acao }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">Nenhum registro nas últimas 72 horas.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Mantém o tema
+        if (localStorage.getItem('tema') === 'dark') document.documentElement.setAttribute('data-bs-theme', 'dark');
+
+        // Filtro de pesquisa em tempo real
+        document.getElementById('buscaLog').addEventListener('keyup', function() {
+            let filtro = this.value.toLowerCase();
+            let linhas = document.querySelectorAll('#tabelaLogs tbody tr');
+            
+            linhas.forEach(linha => {
+                // Se a linha for a mensagem de "Nenhum registro", ignora
+                if(linha.cells.length === 1) return; 
+                
+                let textoLinha = linha.textContent.toLowerCase();
+                if (textoLinha.includes(filtro)) {
+                    linha.style.display = '';
+                } else {
+                    linha.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
