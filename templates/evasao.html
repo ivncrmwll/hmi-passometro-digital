@@ -17,6 +17,7 @@
         <h4 class="text-secondary fw-bold mb-3">🚶 Registrar Evasão</h4>
         <p class="text-muted mb-3">Você está registrando a evasão de <strong>{{ paciente.nome_paciente }}</strong> do setor {{ paciente.setor }}. Esta ação é auditável.</p>
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-4">
                 <label class="form-label fw-bold text-danger">Motivo da Evasão (Obrigatório)</label>
                 <textarea name="motivo" class="form-control" rows="4" placeholder="Descreva os detalhes e o horário notado..." required autofocus></textarea>

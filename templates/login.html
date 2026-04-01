@@ -23,6 +23,7 @@
         {% if erro %} <div class="alert alert-danger p-2 text-center">{{ erro }}</div> {% endif %}
         
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3">
                 <label class="form-label fw-bold">CPF (Somente Números)</label>
                 <input type="text" name="cpf" class="form-control" placeholder="Ex: 12345678900" pattern="\d{11}" maxlength="11" required autofocus>

@@ -1,16 +1,36 @@
 import csv
+import os
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="flask_limiter")
 from io import StringIO
-from flask import Flask, render_template, request, redirect, url_for, session, Response
+from flask import Flask, render_template, request, redirect, url_for, session, Response, abort
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from datetime import datetime, timedelta
+import pytz
 from werkzeug.security import generate_password_hash, check_password_hash
 from fpdf import FPDF
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'chave_seguranca_hospital'
+app.secret_key = os.environ.get('SECRET_KEY', 'fallback_local_apenas')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///passometro.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+fuso_manaus = pytz.timezone('America/Manaus')
+csrf = CSRFProtect(app)
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
 
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -46,27 +66,28 @@ class RegistroLog(db.Model):
 
 def registrar_log(acao):
     if session.get('logado'):
-        log = RegistroLog(
-            usuario_nome=session.get('usuario_nome'), 
-            setor_usuario=session.get('usuario_setor'), 
-            acao=acao
-        )
-        db.session.add(log)
+        try:
+            log = RegistroLog(
+                usuario_nome=session.get('usuario_nome'),
+                setor_usuario=session.get('usuario_setor'),
+                acao=acao
+            )
+            db.session.add(log)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"[ERRO] Falha ao registrar log: {e}")
 
 with app.app_context():
     db.create_all()
         # Atualiza o banco existente sem perder dados
-    try:
-        db.session.execute(db.text('ALTER TABLE plantao ADD COLUMN motivo_evasao TEXT'))
-        db.session.commit()
-    except Exception:
-        pass # A coluna já existe
     if not Usuario.query.filter_by(cpf='00000000000').first():
-        admin = Usuario(cpf='00000000000', nome='Ivan (TI)', cargo='Global Admin', setor='Todos', senha_hash=generate_password_hash('admin123'))
+        admin = Usuario(cpf='00000000000', nome='Ivan (TI)', cargo='Global Admin', setor='Todos', senha_hash=generate_password_hash(os.environ.get('ADMIN_SENHA', 'admin123')))
         db.session.add(admin)
         db.session.commit()
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute; 30 per hour")
 def login():
     if request.method == 'POST':
         usuario = Usuario.query.filter_by(cpf=request.form['cpf']).first()
@@ -121,7 +142,7 @@ def novo_usuario():
 def resetar_senha(id):
     if not session.get('logado'): return redirect(url_for('login'))
     
-    usu = Usuario.query.get_or_404(id)
+    usu = db.session.get(Usuario, id) or abort(404)
     cargo_logado = session.get('usuario_cargo')
     setor_logado = session.get('usuario_setor')
 
@@ -133,7 +154,7 @@ def resetar_senha(id):
         pode_resetar = True
 
     if pode_resetar:
-        usu.senha_hash = generate_password_hash('mudar123')
+        usu.senha_hash = generate_password_hash(os.environ.get('RESET_SENHA', 'mudar123'))
         db.session.commit()
         
     return redirect(url_for('admin'))
@@ -142,7 +163,7 @@ def resetar_senha(id):
 def excluir_usuario(id):
     if not session.get('logado'): return redirect(url_for('login'))
     
-    usu = Usuario.query.get_or_404(id)
+    usu = db.session.get(Usuario, id) or abort(404)
     cargo_logado = session.get('usuario_cargo')
     setor_logado = session.get('usuario_setor')
     id_logado = session.get('usuario_id')
@@ -165,7 +186,7 @@ def excluir_usuario(id):
 def index():
     setor_filtro = request.args.get('setor')
     aba_altas = request.args.get('altas')
-    limite_24h = datetime.now() - timedelta(hours=24)
+    limite_24h = datetime.now(fuso_manaus) - timedelta(hours=24)
     
     # CORREÇÃO: Resgatando o status de login da sessão
     usuario_logado = session.get('logado', False)
@@ -202,7 +223,7 @@ def adicionar():
 @app.route('/editar/<int:id>', methods=['GET', 'POST'])
 def editar(id):
     if not session.get('logado'): return redirect(url_for('login'))
-    paciente = Plantao.query.get_or_404(id)
+    paciente = db.session.get(Plantao, id) or abort(404)
     if request.method == 'POST':
         paciente.prontuario = request.form.get('prontuario', ''); paciente.setor = request.form['setor']; paciente.leito = request.form['leito']
         paciente.nome_paciente = request.form['nome_paciente']; paciente.idade = request.form.get('idade', ''); paciente.tipo_parto = request.form.get('tipo_parto', '')
@@ -223,12 +244,12 @@ def tem_permissao_na_ala(setor_paciente):
 @app.route('/alta/<int:id>')
 def alta(id):
     if not session.get('logado'): return redirect(url_for('login'))
-    paciente = Plantao.query.get_or_404(id)
+    paciente = db.session.get(Plantao, id) or abort(404)
     
     if not tem_permissao_na_ala(paciente.setor) or paciente.setor in ['Orquídeas', 'Acolhimento/Emergência', 'Centro Cirúrgico']:
         return redirect(url_for('index')) # Bloqueado por regra de negócio
 
-    paciente.status = 'Alta'; paciente.data_alta = datetime.now()
+    paciente.status = 'Alta'; paciente.data_alta = datetime.now(fuso_manaus)
     registrar_log(f"Deu alta para o paciente {paciente.nome_paciente} ({paciente.setor})")
     db.session.commit()
     return redirect(url_for('index', altas='true'))
@@ -236,7 +257,7 @@ def alta(id):
 @app.route('/transferir/<int:id>', methods=['GET', 'POST'])
 def transferir(id):
     if not session.get('logado'): return redirect(url_for('login'))
-    paciente = Plantao.query.get_or_404(id)
+    paciente = db.session.get(Plantao, id) or abort(404)
     
     if not tem_permissao_na_ala(paciente.setor): return redirect(url_for('index'))
 
@@ -252,14 +273,14 @@ def transferir(id):
 @app.route('/evasao/<int:id>', methods=['GET', 'POST'])
 def evasao(id):
     if not session.get('logado'): return redirect(url_for('login'))
-    paciente = Plantao.query.get_or_404(id)
+    paciente = db.session.get(Plantao, id) or abort(404)
     
     if not tem_permissao_na_ala(paciente.setor): return redirect(url_for('index'))
 
     if request.method == 'POST':
         paciente.status = 'Evasão'
         paciente.motivo_evasao = request.form['motivo']
-        paciente.data_alta = datetime.now() # Usa a data de alta como data da evasão
+        paciente.data_alta = datetime.now(fuso_manaus) # Usa a data de alta como data da evasão
         registrar_log(f"Registrou EVASÃO do paciente {paciente.nome_paciente}. Motivo: {paciente.motivo_evasao}")
         db.session.commit()
         return redirect(url_for('index'))
@@ -267,7 +288,92 @@ def evasao(id):
 
 @app.route('/exportar/<formato>/<periodo>')
 def exportar(formato, periodo):
-    # (Mesmo código de exportação de antes)
+    if not session.get('logado'):
+        return redirect(url_for('login'))
+
+    # Define o período do filtro
+    if periodo == '24h':
+        limite = datetime.now(fuso_manaus) - timedelta(hours=24)
+    elif periodo == '7d':
+        limite = datetime.now(fuso_manaus) - timedelta(days=7)
+    elif periodo == '30d':
+        limite = datetime.now(fuso_manaus) - timedelta(days=30)
+    else:
+        limite = datetime.now(fuso_manaus) - timedelta(hours=24)
+
+    # Busca os pacientes conforme cargo do usuário
+    cargo = session.get('usuario_cargo')
+    setor = session.get('usuario_setor')
+
+    if cargo == 'Global Admin' or setor == 'Todos':
+        pacientes = Plantao.query.filter(Plantao.data_admissao >= limite).all()
+    else:
+        pacientes = Plantao.query.filter(
+            Plantao.data_admissao >= limite,
+            Plantao.setor == setor
+        ).all()
+
+    # --- EXPORTAÇÃO EM CSV ---
+    if formato == 'csv':
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Prontuário', 'Setor', 'Leito', 'Paciente',
+                         'Idade', 'Diagnóstico', 'Status',
+                         'Data Admissão', 'Data Alta'])
+        for p in pacientes:
+            writer.writerow([
+                p.prontuario, p.setor, p.leito, p.nome_paciente,
+                p.idade, p.diagnostico, p.status,
+                p.data_admissao.strftime('%d/%m/%Y %H:%M') if p.data_admissao else '',
+                p.data_alta.strftime('%d/%m/%Y %H:%M') if p.data_alta else ''
+            ])
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=passometro_{periodo}.csv'}
+        )
+
+    # --- EXPORTAÇÃO EM PDF ---
+    elif formato == 'pdf':
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font('Helvetica', 'B', 14)
+        pdf.cell(0, 10, f'Relatório Passômetro - Período: {periodo}', new_x="LMARGIN", new_y="NEXT", align='C')
+        pdf.set_font('Helvetica', '', 9)
+        pdf.cell(0, 8, f'Gerado em: {datetime.now(fuso_manaus).strftime("%d/%m/%Y %H:%M")} | Usuário: {session.get("usuario_nome")}', new_x="LMARGIN", new_y="NEXT", align='C')
+        pdf.ln(4)
+
+        # Cabeçalho da tabela
+        pdf.set_font('Helvetica', 'B', 8)
+        pdf.set_fill_color(200, 200, 200)
+        pdf.cell(20, 7, 'Prontuário', border=1, fill=True)
+        pdf.cell(30, 7, 'Setor', border=1, fill=True)
+        pdf.cell(15, 7, 'Leito', border=1, fill=True)
+        pdf.cell(50, 7, 'Paciente', border=1, fill=True)
+        pdf.cell(20, 7, 'Status', border=1, fill=True)
+        pdf.cell(30, 7, 'Admissão', border=1, fill=True)
+        pdf.ln()
+
+        # Linhas de dados
+        pdf.set_font('Helvetica', '', 8)
+        for p in pacientes:
+            pdf.cell(20, 6, str(p.prontuario or ''), border=1)
+            pdf.cell(30, 6, str(p.setor or ''), border=1)
+            pdf.cell(15, 6, str(p.leito or ''), border=1)
+            pdf.cell(50, 6, str(p.nome_paciente or ''), border=1)
+            pdf.cell(20, 6, str(p.status or ''), border=1)
+            pdf.cell(30, 6, p.data_admissao.strftime('%d/%m/%Y %H:%M') if p.data_admissao else '', border=1)
+            pdf.ln()
+
+        response = Response(
+            bytes(pdf.output()),
+            mimetype='application/pdf',
+            headers={'Content-Disposition': f'attachment; filename=passometro_{periodo}.pdf'}
+        )
+        return response
+
+    # Formato inválido
     return redirect(url_for('index'))
 
 @app.route('/alterar_senha', methods=['GET', 'POST'])
@@ -275,7 +381,7 @@ def alterar_senha():
     if not session.get('logado'): return redirect(url_for('login'))
     
     if request.method == 'POST':
-        usuario = Usuario.query.get(session['usuario_id'])
+        usuario = db.session.get(Usuario, session['usuario_id'])
         if check_password_hash(usuario.senha_hash, request.form['senha_atual']):
             usuario.senha_hash = generate_password_hash(request.form['nova_senha'])
             db.session.commit()
@@ -289,7 +395,7 @@ def ver_logs():
     if not session.get('logado') or session.get('usuario_cargo') not in ['Global Admin', 'Coord. de Ala']:
         return redirect(url_for('index'))
     
-    limite_72h = datetime.now() - timedelta(hours=72)
+    limite_72h = datetime.now(fuso_manaus) - timedelta(hours=72)
     
     if session.get('usuario_cargo') == 'Global Admin':
         logs_recentes = RegistroLog.query.filter(RegistroLog.data_hora >= limite_72h).order_by(RegistroLog.data_hora.desc()).all()

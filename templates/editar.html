@@ -33,6 +33,7 @@
         <div class="card shadow-sm mx-auto" style="max-width: 700px;">
             <div class="card-body">
                 <form method="POST" action="/editar/{{ paciente.id }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label fw-bold">Prontuário</label>

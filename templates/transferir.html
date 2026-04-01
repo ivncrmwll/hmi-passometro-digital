@@ -17,6 +17,7 @@
         <h4 class="text-warning fw-bold mb-3">🔄 Transferir de Ala</h4>
         <p class="mb-3">Paciente: <strong>{{ paciente.nome_paciente }}</strong><br>Atual: {{ paciente.setor }} (Leito {{ paciente.leito }})</p>
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="mb-3">
                 <label class="form-label fw-bold">Nova Ala / Setor</label>
                 <select name="novo_setor" class="form-select" required>
