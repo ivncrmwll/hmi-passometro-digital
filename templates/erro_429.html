@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Acesso Temporariamente Bloqueado</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .caixa {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-top: 5px solid #dc3545;
+        }
+        h2 { color: #dc3545; }
+        .ip-destaque {
+            font-size: 24px;
+            font-weight: bold;
+            background-color: #f1f1f1;
+            padding: 10px 20px;
+            border-radius: 6px;
+            letter-spacing: 2px;
+            margin: 20px 0;
+            color: #333;
+        }
+        p { color: #555; line-height: 1.6; }
+        .aviso {
+            background-color: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 20px;
+            color: #856404;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="caixa">
+        <h2>🔒 Acesso Temporariamente Bloqueado</h2>
+        <p>Muitas tentativas de login foram detectadas a partir do seu computador.</p>
+
+        <p>O endereço IP da sua máquina é:</p>
+        <div class="ip-destaque">{{ ip }}</div>
+
+        <div class="aviso">
+            📋 <strong>O que fazer?</strong><br><br>
+            Informe este número IP ao seu <strong>Coordenador de Ala</strong> e peça para que ele libere seu acesso no painel administrativo do Passômetro.
+        </div>
+
+        <p style="margin-top: 20px; font-size: 13px; color: #999;">
+            Após ser liberado, aguarde alguns instantes e tente novamente.
+        </p>
+    </div>
+</body>
+</html>

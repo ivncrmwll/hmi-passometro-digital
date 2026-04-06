@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>IPs Liberados — Passômetro</title>
+</head>
+<body>
+    <h2>🔓 Gerenciar IPs Bloqueados</h2>
+
+    <h3>IPs atualmente liberados do bloqueio:</h3>
+
+    {% if ips_liberados %}
+        <table border="1" cellpadding="6">
+            <tr>
+                <th>IP</th>
+                <th>Ação</th>
+            </tr>
+            {% for ip in ips_liberados %}
+            <tr>
+                <td>{{ ip }}</td>
+                <td>
+                    <form method="POST" action="/admin/remover_ip">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="ip" value="{{ ip }}">
+                        <button type="submit">🔒 Revogar liberação</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>Nenhum IP liberado manualmente no momento.</p>
+    {% endif %}
+
+    <hr>
+
+    <h3>Liberar um IP manualmente:</h3>
+    <form method="POST" action="/admin/liberar_ip">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Digite o IP do usuário bloqueado:</label><br><br>
+        <input type="text" name="ip" placeholder="Ex: 192.168.1.10" required>
+        <button type="submit">✅ Liberar IP</button>
+    </form>
+
+    <br>
+    <a href="/admin">← Voltar ao painel admin</a>
+</body>
+</html>

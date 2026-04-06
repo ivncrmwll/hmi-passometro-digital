@@ -25,12 +25,18 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 fuso_manaus = pytz.timezone('America/Manaus')
 csrf = CSRFProtect(app)
+ips_liberados = set()
+
 limiter = Limiter(
     get_remote_address,
     app=app,
     default_limits=[],
     storage_uri="memory://",
 )
+
+@limiter.request_filter
+def verificar_ip_liberado():
+    return request.remote_addr in ips_liberados
 
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -169,10 +175,12 @@ def excluir_usuario(id):
     id_logado = session.get('usuario_id')
 
     if usu.id == id_logado: return redirect(url_for('admin'))
-
     pode_excluir = False
-    if cargo_logado == 'Global Admin' and usu.cargo != 'Global Admin': pode_excluir = True
-    elif cargo_logado == 'Coord. de Ala' and usu.cargo == 'Enfermeiro(a)' and usu.setor == setor_logado: pode_excluir = True
+
+    if cargo_logado == 'Global Admin' and usu.cargo != 'Global Admin':
+        pode_excluir = True
+    elif cargo_logado == 'Coord. de Ala' and usu.cargo == 'Enfermeiro(a)' and usu.setor == setor_logado:
+        pode_excluir = True
 
     if pode_excluir:
         registrar_log(f"Excluiu o usuário {usu.nome} ({usu.cargo})")
@@ -186,23 +194,45 @@ def excluir_usuario(id):
 def index():
     setor_filtro = request.args.get('setor')
     aba_altas = request.args.get('altas')
+    pagina = request.args.get('pagina', 1, type=int)
+    por_pagina = 10
     limite_24h = datetime.now(fuso_manaus) - timedelta(hours=24)
-    
-    # CORREÇÃO: Resgatando o status de login da sessão
+
     usuario_logado = session.get('logado', False)
-    
+
     total_internados = Plantao.query.filter_by(status='Internado').count()
     altas_24h = Plantao.query.filter(Plantao.status == 'Alta', Plantao.data_alta >= limite_24h).count()
     total_setor = Plantao.query.filter_by(status='Internado', setor=setor_filtro).count() if setor_filtro else 0
 
     if aba_altas == 'true':
-        plantoes = Plantao.query.filter(Plantao.status == 'Alta', Plantao.data_alta >= limite_24h).all()
-        return render_template('index.html', plantoes=plantoes, aba_altas=True, total_internados=total_internados, altas_24h=altas_24h, total_setor=total_setor, logado=usuario_logado)
+        paginacao = Plantao.query.filter(
+            Plantao.status == 'Alta',
+            Plantao.data_alta >= limite_24h
+        ).paginate(page=pagina, per_page=por_pagina, error_out=False)
+        return render_template('index.html',
+            plantoes=paginacao.items,
+            paginacao=paginacao,
+            aba_altas=True,
+            total_internados=total_internados,
+            altas_24h=altas_24h,
+            total_setor=total_setor,
+            logado=usuario_logado)
 
     query = Plantao.query.filter_by(status='Internado')
-    if setor_filtro: query = query.filter_by(setor=setor_filtro)
-    
-    return render_template('index.html', plantoes=query.all(), setor_atual=setor_filtro, aba_altas=False, total_internados=total_internados, altas_24h=altas_24h, total_setor=total_setor, logado=usuario_logado)
+    if setor_filtro:
+        query = query.filter_by(setor=setor_filtro)
+
+    paginacao = query.paginate(page=pagina, per_page=por_pagina, error_out=False)
+
+    return render_template('index.html',
+        plantoes=paginacao.items,
+        paginacao=paginacao,
+        setor_atual=setor_filtro,
+        aba_altas=False,
+        total_internados=total_internados,
+        altas_24h=altas_24h,
+        total_setor=total_setor,
+        logado=usuario_logado)
 
 @app.route('/adicionar', methods=['GET', 'POST'])
 def adicionar():
@@ -225,9 +255,15 @@ def editar(id):
     if not session.get('logado'): return redirect(url_for('login'))
     paciente = db.session.get(Plantao, id) or abort(404)
     if request.method == 'POST':
-        paciente.prontuario = request.form.get('prontuario', ''); paciente.setor = request.form['setor']; paciente.leito = request.form['leito']
-        paciente.nome_paciente = request.form['nome_paciente']; paciente.idade = request.form.get('idade', ''); paciente.tipo_parto = request.form.get('tipo_parto', '')
-        paciente.dados_rn = request.form.get('dados_rn', ''); paciente.diagnostico = request.form.get('diagnostico', ''); paciente.observacoes = request.form.get('observacoes', '')
+        paciente.prontuario = request.form.get('prontuario', '')
+        paciente.setor = request.form['setor']
+        paciente.leito = request.form['leito']
+        paciente.nome_paciente = request.form['nome_paciente']
+        paciente.idade = request.form.get('idade', '')
+        paciente.tipo_parto = request.form.get('tipo_parto', '')
+        paciente.dados_rn = request.form.get('dados_rn', '')
+        paciente.diagnostico = request.form.get('diagnostico', '')
+        paciente.observacoes = request.form.get('observacoes', '')
         registrar_log(f"Editou/Movimentou o paciente {paciente.nome_paciente} para o setor {paciente.setor} (Leito {paciente.leito})")
         db.session.commit()
         return redirect(url_for('index', setor=paciente.setor))
@@ -249,7 +285,8 @@ def alta(id):
     if not tem_permissao_na_ala(paciente.setor) or paciente.setor in ['Orquídeas', 'Acolhimento/Emergência', 'Centro Cirúrgico']:
         return redirect(url_for('index')) # Bloqueado por regra de negócio
 
-    paciente.status = 'Alta'; paciente.data_alta = datetime.now(fuso_manaus)
+    paciente.status = 'Alta'
+    paciente.data_alta = datetime.now(fuso_manaus)
     registrar_log(f"Deu alta para o paciente {paciente.nome_paciente} ({paciente.setor})")
     db.session.commit()
     return redirect(url_for('index', altas='true'))
@@ -390,6 +427,34 @@ def alterar_senha():
         
     return render_template('alterar_senha.html')
 
+@app.route('/admin/ips_bloqueados')
+def ips_bloqueados():
+    if not session.get('logado') or session.get('usuario_cargo') != 'Global Admin':
+        return redirect(url_for('index'))
+    return render_template('ips_bloqueados.html', ips_liberados=ips_liberados)
+
+@app.route('/admin/liberar_ip', methods=['POST'])
+def liberar_ip():
+    if not session.get('logado') or session.get('usuario_cargo') != 'Global Admin':
+        return redirect(url_for('index'))
+    ip = request.form.get('ip', '').strip()
+    if ip:
+        ips_liberados.add(ip)
+        registrar_log(f"Liberou o IP {ip} do bloqueio de rate limiting")
+        db.session.commit()
+    return redirect(url_for('ips_bloqueados'))
+
+@app.route('/admin/remover_ip', methods=['POST'])
+def remover_ip():
+    if not session.get('logado') or session.get('usuario_cargo') != 'Global Admin':
+        return redirect(url_for('index'))
+    ip = request.form.get('ip', '').strip()
+    if ip in ips_liberados:
+        ips_liberados.discard(ip)
+        registrar_log(f"Removeu o IP {ip} da lista de liberados")
+        db.session.commit()
+    return redirect(url_for('ips_bloqueados'))
+
 @app.route('/admin/logs')
 def ver_logs():
     if not session.get('logado') or session.get('usuario_cargo') not in ['Global Admin', 'Coord. de Ala']:
@@ -403,6 +468,11 @@ def ver_logs():
         logs_recentes = RegistroLog.query.filter(RegistroLog.data_hora >= limite_72h, RegistroLog.setor_usuario == session.get('usuario_setor')).order_by(RegistroLog.data_hora.desc()).all()
         
     return render_template('logs.html', logs=logs_recentes)
+
+@app.errorhandler(429)
+def erro_rate_limit(e):
+    ip_usuario = request.remote_addr
+    return render_template('erro_429.html', ip=ip_usuario), 429
 
 if __name__ == '__main__':
     from waitress import serve
